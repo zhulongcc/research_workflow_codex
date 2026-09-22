@@ -1,0 +1,7 @@
+Based on skJack/research-workflow
+Upstream: https://github.com/skJack/research-workflow
+Base: 14c882df49a7991b9833f2ff416e4dfd38668827
+Modified: 2026-09-22 (R3)
+Original Markdown prose is retained except for English path names; concise reading aids are added.
+Helper scripts support literature tiers, selected-version downloads and PDF/code annotations.
+This local derivative is not an upstream release. The original Apache-2.0 LICENSE is preserved.

@@ -1,0 +1,10 @@
+# Modified from skJack/research-workflow, 2026-09-22.
+.DS_Store
+*.orig
+__pycache__/
+*.pyc
+.venv/
+.env
+*.part
+tests/
+docs/

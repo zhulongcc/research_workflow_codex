@@ -1,0 +1,2 @@
+# Optional; only scripts/annotate_paper.py and PDF tests require this dependency.
+PyMuPDF>=1.24,<2

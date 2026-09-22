@@ -1,0 +1,18 @@
+{
+  "paper_id": "paper_key",
+  "pdf_version": "REPLACE_WITH_CONFIRMED_PDF_VERSION",
+  "code_version": "REPLACE_WITH_SELECTED_TAG_OR_COMMIT",
+  "mappings": [
+    {
+      "verified": false,
+      "id": "paper_key:M01",
+      "color": "BLUE",
+      "paper_location": "REPLACE_WITH_SECTION_EQUATION_OR_FIGURE",
+      "code_file": "REPLACE_WITH_ACTUAL_RELATIVE_CODE_PATH.py",
+      "code_lines": [1, 5],
+      "symbol": "REPLACE_WITH_ACTUAL_FUNCTION_OR_CLASS",
+      "explanation": "替换为已对照原文与代码的中文解释，不要根据文件名推断。",
+      "anchors": [{"page": 1, "text": "REPLACE_WITH_EXACT_SINGLE_LINE_PDF_TEXT"}]
+    }
+  ]
+}
