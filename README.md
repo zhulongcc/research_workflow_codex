@@ -4,6 +4,9 @@
 > so both you and every fresh agent window know where to read context and where to
 > write results. **中文说明在下面。**
 
+> 本项目基于 [skJack/research-workflow](https://github.com/skJack/research-workflow)，
+> 感谢原作者 skJack。保留原项目的 Apache-2.0 许可证，修改说明见 [NOTICE](NOTICE)。
+
 用 Agent 协作做科研的项目工作流，做成了 Claude Code skill。
 
 核心想法很简单：**科研项目里人和 Agent 的协作，靠一套固定的文件结构来承载**——
@@ -12,7 +15,7 @@
 ## 安装
 
 ```bash
-git clone https://github.com/skJack/research-workflow.git ~/.claude/skills/research-workflow
+git clone https://github.com/zhulongcc/research_workflow_codex.git ~/.claude/skills/research-workflow
 ```
 
 Cursor 用户放 `~/.cursor/skills/` 或 `.agents/skills/`。
