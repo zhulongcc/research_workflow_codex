@@ -1,11 +1,10 @@
 {
-  "paper_id": "paper_key",
+  "paper_title": "替换为选定论文的完整标题",
   "pdf_version": "REPLACE_WITH_CONFIRMED_PDF_VERSION",
   "code_version": "REPLACE_WITH_SELECTED_TAG_OR_COMMIT",
   "mappings": [
     {
       "verified": false,
-      "id": "paper_key:M01",
       "color": "BLUE",
       "paper_location": "REPLACE_WITH_SECTION_EQUATION_OR_FIGURE",
       "code_file": "REPLACE_WITH_ACTUAL_RELATIVE_CODE_PATH.py",

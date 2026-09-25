@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "paper_title": "{{title}}",
+  "status": "partial",
+  "open_source": null,
+  "source": {
+    "pdf": "paper.pdf",
+    "version": ""
+  },
+  "review": {
+    "status": "pending",
+    "reviewed_at": "",
+    "evidence": ""
+  },
+  "code": {
+    "status": "partial",
+    "mapping_file": "paper_code_annotations.json",
+    "annotated_pdf": "paper_annotated.pdf",
+    "coverage": {
+      "input_preprocessing": {
+        "status": "gap",
+        "reason": "",
+        "locations": []
+      },
+      "core_model": {
+        "status": "gap",
+        "reason": "",
+        "locations": []
+      },
+      "training_loss": {
+        "status": "gap",
+        "reason": "",
+        "locations": []
+      },
+      "inference_optimization": {
+        "status": "gap",
+        "reason": "",
+        "locations": []
+      },
+      "evaluation": {
+        "status": "gap",
+        "reason": "",
+        "locations": []
+      }
+    }
+  },
+  "verified_differences": [],
+  "gaps": [
+    "阅读与证据核对尚未完成；按 reading_standard.md 填写后逐项清除此初始缺口。"
+  ]
+}

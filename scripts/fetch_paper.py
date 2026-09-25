@@ -27,6 +27,7 @@ MAX_DOWNLOAD = 128 * 1024 * 1024
 MAX_EXPANDED = 256 * 1024 * 1024
 MAX_MEMBERS = 10000
 LAST_REQUEST = 0.0
+ARXIV_METADATA: dict[str, dict[str, str]] = {}
 
 
 def pinned_id(value: str) -> str:
@@ -42,10 +43,13 @@ def base_id(value: str) -> str:
     return value
 
 
-def resolve_latest(value: str) -> str:
-    """Resolve once via official Atom metadata; never guess a version on failure."""
+def official_metadata(value: str) -> dict[str, str]:
+    """Read the official title and selected version before creating an entry."""
     global LAST_REQUEST
-    value = base_id(value)
+    requested_base = base_id(value)
+    explicit = bool(re.search(r'v[1-9]\d*$', value))
+    if explicit:
+        pinned_id(value)
     time.sleep(max(0.0, 3.0 - (time.monotonic() - LAST_REQUEST)))
     LAST_REQUEST = time.monotonic()
     url = 'https://export.arxiv.org/api/query?id_list=' + quote(value, safe='/')
@@ -56,14 +60,25 @@ def resolve_latest(value: str) -> str:
         raise ValueError('Unexpectedly large arXiv metadata response')
     try:
         atom = ET.fromstring(payload)
-        entry_id = atom.findtext('{http://www.w3.org/2005/Atom}entry/{http://www.w3.org/2005/Atom}id', '')
+        entry = atom.find('{http://www.w3.org/2005/Atom}entry')
+        entry_id = entry.findtext('{http://www.w3.org/2005/Atom}id', '') if entry is not None else ''
         candidate = entry_id.split('/abs/', 1)[1] if '/abs/' in entry_id else ''
         pinned_id(candidate)
     except (ET.ParseError, ValueError) as exc:
         raise ValueError('Could not confirm latest arXiv version; supply a verified vN explicitly.') from exc
-    if base_id(candidate) != value:
+    if base_id(candidate) != requested_base or (explicit and candidate != value):
         raise ValueError('arXiv metadata returned a different paper')
-    return candidate
+    title = ' '.join(entry.findtext('{http://www.w3.org/2005/Atom}title', '').split())
+    if not title:
+        raise ValueError('arXiv metadata did not provide a paper title; supply a verified --title explicitly.')
+    record = {'arxiv_id': candidate, 'title': title}
+    ARXIV_METADATA[candidate] = record
+    return record.copy()
+
+
+def resolve_latest(value: str) -> str:
+    """Resolve once via official Atom metadata; never guess a version on failure."""
+    return official_metadata(base_id(value))['arxiv_id']
 
 
 def select_id(root: Path, value: str, paper_id: str) -> str:
@@ -255,9 +270,12 @@ def prepare_reading_copy(source: Path, raw: Path) -> None:
             shutil.move(str(path), str(source / path.name))
 
 
-def fetch(root: Path, ident: str, paper_id: str, tier: str, paper_type: str = 'method') -> Path:
+def fetch(root: Path, ident: str, paper_id: str, tier: str, paper_type: str = 'method', title: str = '') -> Path:
     pinned_id(ident)
-    entry = wf.add_paper(root, paper_id, tier=tier, paper_type=paper_type, arxiv=ident)
+    existing = wf.find_paper(root, paper_id)
+    if not existing and not title.strip():
+        title = (ARXIV_METADATA.get(ident) or official_metadata(ident))['title']
+    entry = wf.add_paper(root, paper_id, tier=tier, paper_type=paper_type, title=title, arxiv=ident)
     meta_path = wf.contained(root, entry / 'metadata.json')
     meta = wf.read_json(meta_path)
     if meta.get('arxiv_id') not in ('', ident):
@@ -307,13 +325,14 @@ def main() -> int:
     p.add_argument('arxiv_id'); p.add_argument('paper_id', nargs='?')
     p.add_argument('--project', default='.'); p.add_argument('--tier', choices=wf.TIERS, default='inbox')
     p.add_argument('--type', dest='paper_type', choices=wf.TYPES, default='method')
+    p.add_argument('--title', default='', help='Verified paper title; otherwise read official arXiv metadata')
     a = p.parse_args()
     try:
         root = wf.project_path(a.project)
         paper_id = a.paper_id or re.sub(r'[^a-z0-9_-]', '-', base_id(a.arxiv_id).lower())
         wf.slug(paper_id)
         ident = select_id(root, a.arxiv_id, paper_id)
-        fetch(root, ident, paper_id, a.tier, a.paper_type)
+        fetch(root, ident, paper_id, a.tier, a.paper_type, a.title)
         return 0
     except (ValueError, OSError, KeyError, json.JSONDecodeError, HTTPError, URLError) as exc:
         print(f'Error: {exc}', file=sys.stderr)

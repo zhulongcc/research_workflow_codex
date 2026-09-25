@@ -8,5 +8,8 @@ __pycache__/
 *.part
 .vscode/
 
+# Local execution records, session handoffs, and migration backups.
+/.workflow/
+
 tests/
 docs/

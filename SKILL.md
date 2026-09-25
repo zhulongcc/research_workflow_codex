@@ -71,22 +71,60 @@ PDF 和 LaTeX 源码都会下，源码自动清洗（隔离旧稿、剥注释）
    丢的往往正是刚调试出来的结论。
 6. **不自造术语。**解释工作时用领域里已有的词。
 
-<!-- BEGIN reading additions; modified 2026-09-22 (R3). -->
+<!-- BEGIN reading additions; modified 2026-09-25. -->
 ## 文献与代码导读
 
 先按已有信息填 `research_scope.md`，未知项留空，不另开一轮问卷。
+执行前必须读 [READING_WORKFLOW.md](READING_WORKFLOW.md) 与 [READING_STANDARD.md](READING_STANDARD.md)。
+项目副本分别是 `related_work/reading_workflow.md` 和 `related_work/reading_standard.md`。
+前者是执行顺序、轮次、额度和恢复的唯一规范，后者规定单篇内容与格式；不能只生成骨架就结束任务。
 
-| 文件 | 补充用途 |
+主代理必须实际使用 `collaboration` 工具自动派发每篇作者子代理，按并发容量分批；
+自检后再派发未参与该篇写作的独立核验子代理，问题交回作者修复后复核。
+同轮的多个并发批次不是多轮。脚本只记录状态与证据，不会自动调用 agent，也不能代替语义核验。
+阶段、额度、运行与条目内部引用、作者/核验者身份及完整审阅报告，只保留在单个 `.workflow/execution_state.json`。
+候选和证据输入用内存标准输入或项目外临时文件，不能另存带执行标识的报告、元数据、路径或备份。
+正式目录由论文标题或方法名命名，元数据用 title/name，关联用真实路径；官方 DOI/arXiv/commit 保留。
+从生成时就隔离内部标识，收尾再复查。本次迁移仅涉及阅读产物与新 workflow，保留其他任务上下文和历史备份。
+
+按流程先检索初筛和暂定阅读顺序，再由单篇作者获取材料、全文快读确认等级、提取作者贡献原文，
+精确匹配 Paper-Notes 页面，依单篇标准复用经核验的详细内容；不可得时按本 workflow 的写作指引生成。
+完成必译内容、详细 note 和 qa 六问初稿，读懂源码后直接注释关键块并双向标注，据此修订 note/qa。
+结论整合在 note，六问完整问题、答案与依据只放 qa，不另写重复总结。两次分级不单独强制记录调整理由。
+主代理每轮合并新发现与积压候选、更新阅读推荐，在本次任务的轮数和总额度内继续。
+
+| 文件 | 用途 |
 |---|---|
-| `related_work/README.md` | ultra / max / mid 目录分级，survey 单放 |
-| 每篇 `note.md` / `translation_zh.md` / `qa.md` | 先翻译，再精读；问答另记 |
-| `related_work/reading_guide.md` | 方向关系 map、阅读顺序、同期对比 |
-| `related_work/reading_qa.md` | 精读六问、insight、GPT 交互留空 |
-| `reproduce/<类别>/<仓库>/note.md` / `code_map.md` | 初学者导读、代码树说明、论文对应 |
-| `related_work/code_annotation_guide.md` | 同色 PDF 批注 + `reading/annotated` 注释分支 |
-| `method/README.md` | 自己的方法与主张—证据表 |
+| `related_work/README.md` | 论文类型与等级；survey 类型独立，inbox 仅筛选 |
+| 每篇 `note.md` | 材料、英中配对 Highlights、一句话总结、背景、方法详解、实验与消融、局限与启发 |
+| 每篇 `translation_zh.md` / `qa.md` | 必译主要部分；六问完整问题、答案与依据，空白个人区 |
+| `related_work/reading_guide.md` | 最新方向关系、阅读顺序与同期对比 |
+| reproduce 中的 `note.md` / `code_map.md` | 代码主链路与论文对应 |
+| `related_work/code_annotation_guide.md` | PDF 批注及现有源码关键块中文注释 |
+| 每篇 `reading_manifest.json` / `reading.html` | 机器证据记录；无过程横幅的三线表阅读版 |
 
-只用本次确认的最后一版 PDF 与对应代码，不记录 SHA256，不自动更新覆盖笔记。
-源码清洗只作用于同版本阅读副本，原始内容留在 `source/raw/`。
-按任务读相应提示，不要求每篇收录时就走完全流程。新增命令见 `docs/usage.md`。
+正式 ultra/max/mid 的内容底线相同；survey 依 priority 处理，survey+inbox 只做筛选。
+英中配对 Highlights、主要部分译文及独立总结、详细 note、qa 六问答案、每行可见文字 ≤160 字符、Markdown 与三线表 HTML
+仍为正式阅读要求。公开代码需核查适用五类流程；先读懂再注释，不逐行注释、不改行为、不要求专用分支。
+只用选定同版 PDF 与代码，保留原始源码，不记录 SHA256，不自动覆盖笔记。
+PDF、代码与映射通过论文标题、章节/公式、代码位置互相定位，不创建模块流水号或机器边界标记。
+源码只加普通中文“论文对应”解释；manifest 用 paper_title、覆盖项用 locations，核验者身份不写到其中。
+
+阅读完成与实现一致性分开。经独立核验、有证据的真实实现差异可以作为阅读结论收尾；
+未确认缺口仍是 partial / blocked。静态阅读不要求跑实验，未运行不得写成已验证。
+最终正文只呈现最新结论、来源、真实差异与局限，个人原始笔记及交互区不覆盖。
+note 的代码差异嵌入对应方法，Highlights 原句后紧随中文译文，与 translation_zh 的完整译文一致。
+不设文末来源章；实际复用时在材料区用一条简短来源保留作者、原文链接、许可链接和“已改编”。
+详细搜索与纠错记录只入唯一内部状态，不新建公开 provenance；不导入星级、泛赞或自动推荐列表。
+Paper-Notes 改编内容遵守其 CC BY-NC-SA 4.0，不把许可扩展到整个 workflow；本项目写作指引不称为作者 prompt。
+独立核验须核对详细方法解释、实验/消融证据和 qa 完整答案，不能只检查章节齐全。
+
+```bash
+python -m pip install -r <skill>/requirements-reading.txt
+python <skill>/scripts/reading_artifacts.py render <paper-dir> --repo-entry <reproduce-entry>
+python <skill>/scripts/reading_artifacts.py check <paper-dir> --repo-entry <reproduce-entry>
+```
+
+无公开代码时省略 `--repo-entry` 并记录检索依据。检查报告的 `workflow_ready` 不替代独立核验；
+主代理负责确认作者与核验者分离、证据对应当前修订，并检查唯一状态文件以外无执行标识残留。流程命令与阶段见执行规范。
 <!-- END reading additions -->

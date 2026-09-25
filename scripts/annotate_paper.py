@@ -14,6 +14,8 @@ import re
 import sys
 import tempfile
 
+from paper_references import citation, mapping_key
+
 PALETTE = {
     'YELLOW': '#FFD400', 'BLUE': '#2EA8E5', 'ORANGE': '#F19837',
     'GREEN': '#5FB236', 'PURPLE': '#A28AE5',
@@ -42,7 +44,9 @@ def annotate(pdf: Path, repo: Path, mapping_file: Path, output: Path) -> int:
     data = json.loads(mapping_file.read_text(encoding='utf-8'))
     if not isinstance(data, dict):
         raise ValueError('Mapping must be a JSON object')
-    paper_id = nonblank(data, 'paper_id')
+    paper_title = nonblank(data, 'paper_title')
+    if 'paper_id' in data:
+        raise ValueError('Keep temporary paper identifiers only in execution_state.json')
     pdf_version, code_version = nonblank(data, 'pdf_version'), nonblank(data, 'code_version')
     mappings = data.get('mappings')
     if not isinstance(mappings, list) or not mappings:
@@ -54,14 +58,12 @@ def annotate(pdf: Path, repo: Path, mapping_file: Path, output: Path) -> int:
             raise ValueError('PDF permissions do not allow annotations')
         original_text = [page.get_text() for page in doc]
         planned = []
-        ids = set()
+        locations = set()
         for item in mappings:
             if not isinstance(item, dict) or item.get('verified') is not True:
                 raise ValueError('Inspect each mapping, then explicitly mark verified=true; no guessed mappings.')
-            ident = nonblank(item, 'id')
-            if not re.fullmatch(re.escape(paper_id) + r':M[0-9]{2,}', ident) or ident in ids:
-                raise ValueError(f'Use a unique {paper_id}:M01-style mapping id')
-            ids.add(ident)
+            if 'id' in item:
+                raise ValueError('Use paper location and code position, not an annotation identifier')
             color = nonblank(item, 'color').upper()
             if color not in PALETTE:
                 raise ValueError(f'Unsupported module color: {color}')
@@ -79,8 +81,13 @@ def annotate(pdf: Path, repo: Path, mapping_file: Path, output: Path) -> int:
             symbol = nonblank(item, 'symbol')
             location = nonblank(item, 'paper_location')
             explanation = nonblank(item, 'explanation')
+            ident = citation(paper_title, item)
+            key = mapping_key(item)
+            if key in locations:
+                raise ValueError('Duplicate paper/code location: ' + ident)
+            locations.add(key)
             snippet = '\n'.join(source[start-1:end])
-            content = (f'[P2C {ident} | {color}]\n论文：{pdf_version}；{location}\n'
+            content = (f'{ident}\n论文版本：{pdf_version}；类别：{color}\n'
                        f'代码版本：{code_version}\n文件：{rel}:{start}-{end}；符号：{symbol}\n\n'
                        f'对应说明：{explanation}\n\n代码（原样摘录）：\n{snippet}')
             anchors = item.get('anchors')
@@ -124,8 +131,8 @@ def annotate(pdf: Path, repo: Path, mapping_file: Path, output: Path) -> int:
         count = 0
         for page_no, quads, color, content, ident in grouped.values():
             page = doc[page_no]
-            # Retain all previous annotations; require a clean source for these new IDs.
-            if any(f'[P2C {ident} |' in a.info.get('content', '') for a in (page.annots() or [])):
+            # Retain personal annotations; refuse duplicate semantic references.
+            if any(ident in a.info.get('content', '') for a in (page.annots() or [])):
                 raise ValueError(f'{ident}: source already contains this mapping; do not duplicate existing notes')
             mark = page.add_highlight_annot(quads)
             h = PALETTE[color].lstrip('#')

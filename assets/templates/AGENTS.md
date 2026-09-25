@@ -54,12 +54,34 @@
 4. **跑完必须走标准化测评。**见 `experiment/evaluation.md`，不要临时挑指标。
 5. **窗口快满了跟我说，我让你更新 handoff。**不要硬撑到被截断。
 
-<!-- BEGIN reading additions; modified 2026-09-22 (R3). -->
+<!-- BEGIN reading additions; modified 2026-09-25. -->
 ## 文献与代码导读
 
-文献分级先看 [research_scope.md](research_scope.md)，规则见 [related_work/README.md](related_work/README.md)。
-每篇先按 `note.md` 翻译和精读，详细问答写 `qa.md`；方向 map 和阅读顺序见 `related_work/reading_guide.md`。
-代码先看对应仓库的 `note.md` 与 `code_map.md`，只在 `reading/annotated` 分支加注释；
-论文端按 `related_work/code_annotation_guide.md` 做同色批注，在 Zotero 中查看。
-自己的方法写 `method/README.md`；只用选定的最后一版 PDF 与对应代码，不记录 SHA256。
+文献任务先读 [research_scope.md](research_scope.md)、[执行流程](related_work/reading_workflow.md)
+和 [单篇标准](related_work/reading_standard.md)。流程是轮次、额度、分工、先后关系与恢复的唯一正文。
+主代理必须使用 collaboration 工具自动派发每篇作者和未参与写作的独立核验子代理，按并发容量分批。
+脚本只记录状态和证据，不能替代真实派发、阅读或独立核验。
+
+先初筛暂定级与阅读顺序，再获取材料、全文快读确认级、匹配 Paper-Notes、提取原文贡献、翻译和初稿、
+源码对照、修订 note/qa、自检和独立核验。结论整合进 note，六问完整问题、答案及依据只放 qa；不另建重复总结。
+Paper-Notes 准确匹配时依单篇标准复用并核验纠错；不可得时按本 workflow 的详细写作指引生成。
+实际复用时仅在材料区保留一条来源（作者、原文链接、许可链接、已改编），不另设文末来源章。
+详细搜索与纠错记录只入唯一内部状态，不新建公开 provenance；不导入星级、泛赞或自动推荐。
+两次分级不单独强制记录调整理由。
+survey 类型与 priority 正交，survey+inbox 只筛选、不展开引用链；晋级按流程使用正式额度。
+
+最终阅读内容只保留最新定稿、来源、真实差异及局限。运行、条目、作者与核验者的内部引用，以及初筛、
+额度、审阅和修复报告只保存在单个 `.workflow/execution_state.json`；输入使用内存或项目外临时文件。
+正式目录采用论文标题或方法名，元数据用 title/name，关联用真实路径。其他正文、路径、元数据、源码与 PDF
+不保留执行标识或额外映射流水号；标注使用标题、章节/公式和代码位置。官方 DOI/arXiv/commit 保留。
+按单篇标准保留逐条英中配对 Highlights、主要部分译文及总结、详细 note 和 qa 六问答案及空白个人区。
+note 每条原句后紧随忠实中文译文，与 translation_zh 中完整 Highlights 翻译保持一致。
+note 按材料、Highlights、一句话总结、背景与动机、方法详解、实验与消融、局限与启发组织，代码差异融入相关模块。
+独立核验必须核对方法机制、实验与消融证据及 qa 答案，不只检查结构。
+每行表格可见文字合计 ≤160 字符，同时交付 Markdown 与三线表 HTML。
+
+读懂代码后，直接在现有源码关键块旁加中文解释，不逐行注释、不重构、不改行为、无须专用分支。
+按 [标注规范](related_work/code_annotation_guide.md) 完成适用五类核心对应；已独立核实的真实差异可作为阅读结论，
+未确认缺口保持 partial / blocked。阅读完成、实现一致性和实验复现分开，未运行不声称验证。
+只用选定同版 PDF 与代码，不记录 SHA256；不覆盖用户原始笔记、个人交互或 PDF 批注。
 <!-- END reading additions -->
