@@ -55,6 +55,101 @@ class MarkdownTests(unittest.TestCase):
             self.assertIn('unsupported_html', [e['code'] for e in report['errors']])
 
 
+class TranslationTests(unittest.TestCase):
+    def setUp(self):
+        self.parts = {}
+        for name in ('摘要', 'Highlights', '引言', '相关工作', '方法', '不足', '未来展望'):
+            self.parts[name] = (f'\n## {name}\n\n原文位置：PDF 第 2 页，对应原文章节。\n\n'
+                                '### 中文翻译\n\n我们将输入图像转换为连续方向场，并仅在具有多视角观测的条件下优化几何。\n\n'
+                                '### Agent 总结\n\n这一部分说明了表示方式与观测条件之间的关系。\n')
+
+    def codes(self, text=None):
+        report = {'errors': [], 'gaps': []}
+        reading.check_translations(reading.markdown().parse(text or ''.join(self.parts.values())), report)
+        return [e['code'] for e in report['errors']]
+
+    def replace_translation(self, name, content):
+        start = self.parts[name].index('### 中文翻译')
+        end = self.parts[name].index('### Agent 总结')
+        self.parts[name] = self.parts[name][:start] + '### 中文翻译\n\n' + content + '\n\n' + self.parts[name][end:]
+
+    def test_required_introduction_and_related_work_cannot_be_navigation(self):
+        for name in ('引言', '相关工作'):
+            original = self.parts[name]
+            for content in ('本节翻译请前往 [精读正文](note.md#背景与动机) 查看，此处不再重复。',
+                            '详见 note.md 中的说明，这里只给出阅读入口。',
+                            '[查看完整的中文译文与详细解释](note.md)',
+                            '原文位置：PDF 第 2–3 页，Section 1 包含这一部分的全部论述。'):
+                with self.subTest(name=name, content=content):
+                    self.parts[name] = original
+                    self.replace_translation(name, content)
+                    self.assertIn('translation_body', self.codes())
+            self.parts[name] = original
+
+    def test_summary_cannot_supply_missing_translation(self):
+        self.replace_translation('引言', '')
+        self.assertIn('translation_body', self.codes())
+        self.parts['引言'] = self.parts['引言'].replace('### 中文翻译\n\n', '')
+        self.assertIn('translation_body', self.codes())
+
+    def test_nested_agent_analysis_does_not_count_as_translated_prose(self):
+        self.replace_translation('方法', '#### Agent 分析（非原文）\n\n这是代理解释的方法关系，不能代替原文逐段翻译。')
+        self.assertIn('translation_body', self.codes())
+
+    def test_code_image_table_and_english_cannot_replace_translation(self):
+        original = self.parts['相关工作']
+        for content in ('```text\n这是代码块中的中文，不能代替实际的正文译文。\n```',
+                        '![这是图片的中文描述，不能代替相关工作译文。](figure.png)',
+                        '| 来源 | 状态 |\n|---|---|\n| 引言与相关工作 | 已在笔记中处理 |',
+                        'Previous methods optimize the scene under multiple calibrated views.'):
+            with self.subTest(content=content):
+                self.parts['相关工作'] = original
+                self.replace_translation('相关工作', content)
+                self.assertIn('translation_body', self.codes())
+
+    def test_seven_sections_need_independent_top_level_headings(self):
+        original = self.parts['引言']
+        self.parts['引言'] = self.parts['引言'].replace('## 引言', '### 引言')
+        self.assertIn('translation_section', self.codes())
+        self.parts['引言'] = original
+        self.assertIn('translation_section', self.codes(''.join(self.parts.values()) + original))
+        reordered = ''.join(self.parts[name] for name in ('摘要', 'Highlights', '相关工作', '引言', '方法', '不足', '未来展望'))
+        self.assertIn('translation_section_order', self.codes(reordered))
+        self.parts['不足'] = self.parts['不足'].replace('## 不足', '## 不足与未来展望')
+        del self.parts['未来展望']
+        self.assertIn('translation_sections_combined', self.codes())
+
+    def test_source_scope_and_each_highlight_translation_are_required(self):
+        self.parts['相关工作'] = self.parts['相关工作'].replace('原文位置：PDF 第 2 页，对应原文章节。', '')
+        self.assertIn('translation_source', self.codes())
+        self.parts['Highlights'] += '\n### 第二条贡献 — 中文翻译\n\n[对应贡献译文](note.md)\n'
+        self.assertIn('translation_body', self.codes())
+
+    def test_real_translation_allows_technical_terms_citations_and_reading_links(self):
+        self.replace_translation('方法', '#### 3.1 Method overview\n\n我们使用 `3DGS` 优化方向场 $D(x)$，保留 [前驱工作](paper.pdf#page=2) 中定义的约束。\n\n进一步解读见 [精读笔记](note.md#方法详解)。')
+        self.assertEqual(self.codes(), [])
+        self.replace_translation('方法', '我们从多视角图像重建发丝，并共同优化几何和外观参数。进一步解读见 [note](note.md)。')
+        self.assertEqual(self.codes(), [])
+        self.parts['Highlights'] = self.parts['Highlights'].replace('### 中文翻译', '### 理论分析 — 中文翻译')
+        self.assertEqual(self.codes(), [])
+
+    def test_distributed_related_work_and_source_absence_have_explicit_scope(self):
+        self.parts['相关工作'] = self.parts['相关工作'].replace('PDF 第 2 页，对应原文章节。', 'PDF 第 1–2 页，Introduction 中讨论前驱方法的段落。')
+        self.replace_translation('未来展望', '原文未明确讨论。\n\n核查范围：结论、讨论及补充材料全文。')
+        self.assertEqual(self.codes(), [])
+        self.replace_translation('未来展望', '原文未明确讨论。核查范围：结论、讨论及补充材料全文。')
+        self.assertEqual(self.codes(), [])
+        self.parts['未来展望'] = self.parts['未来展望'].replace('核查范围：结论、讨论及补充材料全文。', '')
+        self.assertIn('translation_absence_scope', self.codes())
+        self.replace_translation('摘要', '原文无对应内容。\n\n核查范围：全文。')
+        self.assertIn('translation_absence', self.codes())
+
+    def test_english_bilingual_section_headings_are_accepted(self):
+        for chinese, english in (('引言', 'Introduction（引言）'), ('相关工作', 'Related Work'), ('未来展望', 'Future Work')):
+            self.parts[chinese] = self.parts[chinese].replace('## ' + chinese, '## ' + english)
+        self.assertEqual(self.codes(), [])
+
+
 class RepositoryPathTests(unittest.TestCase):
     def test_retier_updates_current_grade_without_reason_history(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -191,7 +286,7 @@ The reported evidence supports the tested conditions and leaves broader generali
             qa += f'<a id="q{number}"></a>\n\n### Q{number} What does the paper establish?\n\nAnswer: This is a substantive grounded answer referring to the source paper section.\n\nEvidence: Section {number} of the selected source paper.\n\n'
         (self.paper / 'note.md').write_text(note)
         (self.paper / 'qa.md').write_text(qa)
-        (self.paper / 'translation_zh.md').write_text('# 中文译文\n' + ''.join(f'\n## {name}\n\n这是具有实质内容的译文示例，包含来自原论文的明确论述及出处说明。\n' for name in ['摘要', 'Highlights', '方法', '不足', '未来展望']))
+        (self.paper / 'translation_zh.md').write_text('# 中文译文\n' + ''.join(f'\n## {name}\n\n原文位置：对应原文章节，PDF 第 1 页。\n\n### 中文翻译\n\n我们使用多视角图像优化场景表示，并在给定观测条件下比较几何重建结果。\n' for name in ['摘要', 'Highlights', '引言', '相关工作', '方法', '不足', '未来展望']))
         document = fitz.open()
         page = document.new_page()
         for number in range(1, 6):
@@ -341,6 +436,16 @@ The reported evidence supports the tested conditions and leaves broader generali
         codes = self.codes()
         self.assertIn('six_answer', codes)
         self.assertIn('placeholder', codes)
+
+    def test_verified_manifest_cannot_excuse_a_missing_introduction_translation(self):
+        path = self.paper / 'translation_zh.md'
+        original = path.read_text()
+        start, end = original.index('## 引言'), original.index('## 相关工作')
+        path.write_text(original[:start] + '## 引言\n\n原文位置：PDF 第 1 页，引言。\n\n### 中文翻译\n\n译文请见 note.md，此处不再重复。\n\n' + original[end:])
+        report = reading.check(self.paper, self.entry)
+        self.assertFalse(report['workflow_ready'])
+        self.assertEqual(report['structural_checks'], 'failed')
+        self.assertIn('translation_body', [e['code'] for e in report['errors']])
 
     def test_question_table_is_navigation_not_answer(self):
         qa = self.paper / 'qa.md'

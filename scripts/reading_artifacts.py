@@ -30,6 +30,16 @@ COLORS = {'YELLOW': (255, 212, 0), 'BLUE': (46, 168, 229), 'ORANGE': (241, 152, 
           'GREEN': (95, 178, 54), 'PURPLE': (162, 138, 229)}
 DOCS = ('note.md', 'translation_zh.md', 'qa.md')
 NOTE_SECTIONS = ('材料', 'Highlights', '一句话总结', '背景与动机', '方法详解', '实验与消融', '局限与启发')
+TRANSLATION_SECTIONS = (
+    ('摘要', r'摘要|\babstract\b'), ('Highlights', r'\bhighlights\b'),
+    ('引言', r'引言|\bintroduction\b'), ('相关工作', r'相关工作|\brelated\s+work\b'),
+    ('方法', r'方法|\bmethods?\b'), ('不足', r'不足|局限|\blimitations?\b'),
+    ('未来展望', r'未来|展望|\bfuture\b'),
+)
+TRANSLATION_LABEL = re.compile(r'翻译|译文|\btranslation\b', re.I)
+ANALYSIS_LABEL = re.compile(r'^(?:Agent\b|代理).*(?:总结|概述|分析|summary|overview|analysis)|^(?:总结|概述|分析|summary|overview|analysis)(?:[（(].*[）)])?$', re.I)
+SOURCE_LABEL = re.compile(r'^(?:原文(?:位置|定位|来源)|翻译范围|(?:原文)?核查范围)(?:\s*[/／]\s*核查范围)?\s*[:：]\s*\S+', re.I)
+ABSENT_TRANSLATION = re.compile(r'^原文(?:未明确讨论|无对应(?:内容|论述))')
 PLACEHOLDER = re.compile(r'\{\{[^}]*\}\}|\b(?:TODO|TBD|FIXME|REPLACE_WITH_[A-Z_]+)\b|待填写|待补充|待翻译|尚未开始翻译', re.I)
 NOTICE = '程序只核验结构、文件与证据一致性；不证明翻译准确、映射语义正确或实验已复现。'
 
@@ -172,6 +182,100 @@ def prose_without_links(tokens):
     return '\n'.join(output).strip()
 
 
+def translation_paragraphs(tokens):
+    """Separate literal translation prose from navigation and reader analysis.
+
+    This detects missing text, not whether a Chinese paraphrase faithfully
+    translates every required source paragraph. That remains an independent review.
+    """
+    output, redirects = [], []
+    heading_depth, table_depth, excluded_level = 0, 0, None
+    for i, token in enumerate(tokens):
+        if token.type == 'heading_open':
+            level = int(token.tag[1:])
+            if excluded_level is not None and level <= excluded_level:
+                excluded_level = None
+            title = visible(tokens[i + 1].children)
+            # Source subheadings such as “3.1 Method overview” belong to the
+            # translated paper. Only reader-summary headings delimit analysis.
+            reader_heading = level == 3 or re.match(r'^(?:Agent\b|代理)', title, re.I)
+            if excluded_level is None and reader_heading and ANALYSIS_LABEL.search(title):
+                excluded_level = level
+            heading_depth += 1
+        elif token.type == 'heading_close':
+            heading_depth -= 1
+        elif token.type == 'table_open':
+            table_depth += 1
+        elif token.type == 'table_close':
+            table_depth -= 1
+        elif token.type == 'inline' and not heading_depth and not table_depth and excluded_level is None:
+            parts, link_depth = [], 0
+            for child in token.children or []:
+                if child.type == 'link_open':
+                    target = urlsplit(child.attrGet('href') or '')
+                    if (Path(unquote(target.path)).name == 'note.md'
+                            or unquote(target.fragment).startswith('doc-note')):
+                        parts.append(' note.md ')
+                    link_depth += 1
+                elif child.type == 'link_close':
+                    link_depth -= 1
+                elif not link_depth and child.type != 'image':
+                    parts.append(visible([child]))
+            # Remove navigation sentences, not the adjacent translated sentence
+            # when a reader puts both in the same Markdown paragraph.
+            for prose in re.split(r'(?<=[。！？!?])\s*|\n', ''.join(parts)):
+                prose = prose.strip()
+                if not prose or SOURCE_LABEL.match(prose):
+                    continue
+                mentions_note = re.search(r'\bnote(?:\.md)?\b|精读笔记', prose, re.I)
+                deferred = re.search(r'(?:翻译|译文).*(?:省略|从略|已移至)|(?:此处|这里|本节|本部分).*(?:不再|无需|不提供|不予).*(?:翻译|译文|重译)', prose)
+                if mentions_note and (re.search(r'(?:翻译|译文).*(?:见|查看|参阅|前往|已在|放在|置于)|(?:不再|无需|不必|不).*(?:重复|赘述)', prose)
+                                      or re.search(r'\b(?:translation|translated)\b.*\b(?:see|refer|note)\b', prose, re.I)):
+                    deferred = True
+                if deferred:
+                    redirects.append(prose)
+                elif not (mentions_note and re.search(r'见|查看|参阅|参考|前往|阅读|\b(?:see|read|refer)\b', prose, re.I)):
+                    output.append(prose)
+    return output, redirects
+
+
+def check_translations(tokens, report):
+    top = [s for s in sections(tokens) if s['level'] == 2]
+    claimed, order = {}, []
+    for name, pattern in TRANSLATION_SECTIONS:
+        matches = [s for s in top if re.search(pattern, s['title'], re.I)]
+        if len(matches) != 1:
+            issue(report, 'translation_section', f'translation_zh.md needs one separate level-2 {name} section.')
+            continue
+        section = matches[0]
+        order.append(section['line'])
+        if section['line'] in claimed:
+            issue(report, 'translation_sections_combined', f'{claimed[section["line"]]} and {name} must have separate sections.')
+        claimed[section['line']] = name
+        source_lines = [line.strip() for t in section['tokens'] if t.type == 'inline'
+                        for line in re.split(r'(?<=[。；])\s*|\n', visible(t.children))]
+        if not any(SOURCE_LABEL.match(line) for line in source_lines):
+            issue(report, 'translation_source', f'{name}: record the actual source location or checked scope inside this section.')
+        blocks = [s for s in sections(section['tokens']) if s['level'] == 3
+                  and TRANSLATION_LABEL.search(s['title']) and not ANALYSIS_LABEL.search(s['title'])]
+        if not blocks:
+            issue(report, 'translation_body', f'{name}: add an explicit Chinese-translation subsection; summaries and note.md links cannot replace it.')
+            continue
+        for block in blocks:
+            paragraphs, redirects = translation_paragraphs(block['tokens'])
+            if redirects:
+                issue(report, 'translation_redirect', f'{name}: write the translation here instead of omitting it or referring readers to note.md.', line=block['line'])
+            if not any(re.search(r'[\u3400-\u9fff]', text) for text in paragraphs):
+                issue(report, 'translation_body', f'{name}: the translation subsection has no Chinese prose after excluding headings, summaries, tables, code and navigation.', line=block['line'])
+            if any(ABSENT_TRANSLATION.match(text) for text in paragraphs):
+                if name not in ('引言', '相关工作', '不足', '未来展望'):
+                    issue(report, 'translation_absence', f'{name}: absence cannot replace required translated content.')
+                if not any(re.match(r'^(?:原文位置\s*[/／]\s*)?(?:原文)?核查范围\s*[:：]\s*\S+', line) for line in source_lines):
+                    issue(report, 'translation_absence_scope', f'{name}: an absence declaration needs an explicit checked source scope and independent confirmation.')
+    if order != sorted(order):
+        issue(report, 'translation_section_order', 'Translation sections must follow: ' + ' → '.join(name for name, _ in TRANSLATION_SECTIONS))
+
+
 def check_sections(docs, report):
     note = sections(docs.get('note.md', ('', []))[1])
     ordered = []
@@ -257,16 +361,7 @@ def check_sections(docs, report):
                         and (unquote(target.path) in ('note.md', './note.md') or filename == 'note.md' and not target.path)
                         and re.fullmatch(r'q[1-6]|精读六问', unquote(target.fragment), re.I)):
                     issue(report, 'old_question_link', f'{filename} still links to six-question answers in note.md; link to qa.md instead.')
-    trans = sections(docs.get('translation_zh.md', ('', []))[1])
-    for name, pattern in [('摘要', r'摘要|abstract'), ('Highlights', r'highlights'), ('方法', r'方法|method'),
-                          ('不足', r'不足|局限|limitation'), ('未来展望', r'未来|展望|future')]:
-        matches = [s for s in trans if re.search(pattern, s['title'], re.I)]
-        if not any(len(s['body'].strip()) >= 20 for s in matches):
-            issue(report, 'translation_section', f'translation_zh.md needs a substantive {name} section.')
-    limits = [s for s in trans if re.search(r'不足|局限|limitation', s['title'], re.I)]
-    future = [s for s in trans if re.search(r'未来|展望|future', s['title'], re.I)]
-    if limits and future and limits[0] is future[0]:
-        issue(report, 'translation_sections_combined', '不足 and 未来展望 must have separate sections.')
+    check_translations(docs.get('translation_zh.md', ('', []))[1], report)
 
 
 def git(repo: Path, *args: str) -> str:

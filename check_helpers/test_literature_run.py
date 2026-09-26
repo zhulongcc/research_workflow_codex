@@ -284,7 +284,7 @@ class FormalStageTests(FixtureSupport, unittest.TestCase):
             qa += f'\n### Q{n} What does this evidence establish?\n\nThis answer explains the paper evidence and its precise scope and limitations.\n\nEvidence: Source paper section {n}.\n'
         (paper / 'note.md').write_text(note)
         (paper / 'qa.md').write_text(qa)
-        (paper / 'translation_zh.md').write_text('# Translation\n' + ''.join(f'\n## {section}\n\n这是来自原文的实际章节翻译测试材料，保留论述范围，并说明来源和总结边界。\n' for section in ['摘要', 'Highlights', '方法', '不足', '未来展望']))
+        (paper / 'translation_zh.md').write_text('# Translation\n' + ''.join(f'\n## {section}\n\n原文位置：对应原文章节，PDF 第 1 页。\n\n### 中文翻译\n\n我们使用多视角图像优化场景表示，并在给定观测条件下比较几何重建结果。\n' for section in ['摘要', 'Highlights', '引言', '相关工作', '方法', '不足', '未来展望']))
         json_file(paper / 'reading_manifest.json', {'schema_version': 1, 'paper_title': self.title(key), 'status': 'complete', 'open_source': False, 'source': {'pdf': 'paper.pdf', 'version': '0000.00001v1'}, 'review': {'status': 'verified', 'reviewed_at': '2026-09-24', 'evidence': 'Read actual source and checked these fixture artifacts.'}, 'code': {'status': 'not_applicable'}, 'gaps': [], 'verified_differences': []})
 
     def classify(self, key='paper-one', priority='ultra', no_latex=False):
@@ -430,6 +430,19 @@ class FormalStageTests(FixtureSupport, unittest.TestCase):
         self.run.revise('paper-one', 'Author revises the final note after review')
         self.assertEqual(self.run.load()['tasks']['paper-one']['phase'], 'classified')
         self.assertIsNone(self.run.load()['tasks']['paper-one']['review'])
+
+    def test_draft_cannot_advance_with_a_note_redirect_instead_of_translation(self):
+        self.classify(); self.documents()
+        path = self.paper_path() / 'translation_zh.md'
+        original = path.read_text()
+        start, end = original.index('## 相关工作'), original.index('## 方法')
+        path.write_text(original[:start] + '## 相关工作\n\n原文位置：PDF 第 1 页，Related Work。\n\n### 中文翻译\n\n请前往 note.md 查看译文，此处不再重复。\n\n' + original[end:])
+        with self.assertRaisesRegex(ValueError, 'translation_body'):
+            self.run.advance('paper-one', 'drafted', {'report': self.report('paper-one', 'drafted')})
+        self.assertEqual(self.run.load()['tasks']['paper-one']['phase'], 'classified')
+        path.write_text(original)
+        self.run.advance('paper-one', 'drafted', {'report': self.report('paper-one', 'drafted')})
+        self.assertEqual(self.run.load()['tasks']['paper-one']['phase'], 'drafted')
 
     def test_missing_or_stale_html_prevents_independent_acceptance(self):
         self.classify(); self.documents()
